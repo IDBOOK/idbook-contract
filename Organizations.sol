@@ -3,7 +3,7 @@ pragma solidity >=0.4.21 <0.6.0;
 contract Organizations {
     struct Member {
         address addr;
-        mapping (string => bool) endorsements;
+        mapping (bytes32 => bool) endorsements;
     }
 
     struct Organization {
@@ -150,7 +150,7 @@ contract Organizations {
         Organization storage org = organizations[orgID];
         require(org.founder != msg.sender, "Permission denied. Call dismiss instead.");
 
-        delete org.members[msg.sender]; // TODO: check
+        delete org.members[msg.sender];
     }
 
     function expel(bytes32 orgID, address member) public founderOnly(orgID) {
@@ -163,10 +163,51 @@ contract Organizations {
         delete org.members[member];
     }
 
-    function isMember(bytes32 orgID, address addr) public view returns (bool) {
-        require(addr != address(0), "Invalid addr.");
+    function checkMember(bytes32 orgID, address member) public view returns (bool) {
+        require(member != address(0), "Invalid member.");
 
-        return organizations[orgID].members[addr].addr == addr;
+        return organizations[orgID].members[member].addr == member;
+    }
+
+    function addEndorsement(bytes32 orgID, address member, bytes32 hash)
+        public
+        founderOnly(orgID)
+    {
+        require(member != address(0), "Invalid member.");
+
+        Organization storage org = organizations[orgID];
+        require(org.members[member].addr == member, "Member does not exist.");
+
+        require(
+            !organizations[orgID].members[member].endorsements[hash],
+            "Duplicate endorsement."
+        );
+
+        organizations[orgID].members[member].endorsements[hash] = true;
+    }
+
+    function removeEndorsement(bytes32 orgID, address member, bytes32 hash)
+        public
+        founderOnly(orgID)
+    {
+        require(member != address(0), "Invalid member.");
+
+        Organization storage org = organizations[orgID];
+        require(org.members[member].addr == member, "Member does not exist.");
+
+        require(
+            organizations[orgID].members[member].endorsements[hash],
+            "Endorsement does not exist."
+        );
+
+        delete organizations[orgID].members[member].endorsements[hash];
+    }
+
+    function checkEndorsement(bytes32 orgID, address member, bytes32 hash)
+        public view
+        returns (bool)
+    {
+        return organizations[orgID].members[member].endorsements[hash];
     }
 
     function getInfo(bytes32 orgID)
