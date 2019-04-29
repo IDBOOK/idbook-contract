@@ -18,15 +18,15 @@ contract Organizations {
     }
 
     struct Application {
-        bytes32 orgID;
         address applicant;
         uint dues;
+        bool rejected;
     }
 
     address lord;
     uint minPledge;
     mapping (bytes32 => Organization) organizations;
-    mapping (bytes32 => Application) applications;
+    mapping (bytes32 => mapping (address => Application)) applications;
     uint nonce;
 
     modifier founderOnly(bytes32 orgID) {
@@ -45,9 +45,9 @@ contract Organizations {
         _;
     }
 
-    modifier applicantOnly(bytes32 appID) {
+    modifier applicantOnly(bytes32 orgID) {
         require(
-            applications[appID].applicant == msg.sender,
+            applications[orgID][msg.sender].applicant == msg.sender,
             "Permission denied. Applicant only."
         );
         _;
@@ -99,50 +99,52 @@ contract Organizations {
         msg.sender.transfer(value);
     }
 
-    function applyJoin(bytes32 orgID, string memory words)
-        public payable
-        returns (bytes32 appID)
-    {
+    function applyJoin(bytes32 orgID, string memory words) public payable {
         Organization storage org = organizations[orgID];
 
         require(org.founder != address(0), "Organization does not exist");
         require(org.members[msg.sender].addr == address(0), "Already joined in.");
         require(msg.value >= org.dues, "Insufficient dues.");
+        require(applications[orgID][msg.sender].applicant == address(0), "Duplicate application.");
 
-        appID = genID();
-        require(applications[appID].applicant == address(0), "Duplicate application ID.");
-
-        applications[appID] = Application({
-            orgID: orgID,
+        applications[orgID][msg.sender] = Application({
             applicant: msg.sender,
-            dues: msg.value
+            dues: msg.value,
+            rejected: false
         });
-
-        return appID;
     }
 
-    function cancelApplication(bytes32 appID) public applicantOnly(appID) {
-        uint dues = applications[appID].dues;
+    function cancelApplication(bytes32 orgID) public applicantOnly(orgID) {
+        uint dues = applications[orgID][msg.sender].dues;
 
-        delete applications[appID];
+        delete applications[orgID][msg.sender];
 
         msg.sender.transfer(dues);
     }
 
-    function auditApplication(bytes32 appID) public {
-        Application storage app = applications[appID];
+    function approveApplication(bytes32 orgID, address applicant) public {
+        Application storage app = applications[orgID][applicant];
         require(app.applicant != address(0), "Application does not exist");
+        require(!app.rejected, "Application has been rejected.");
 
-        Organization storage org = organizations[app.orgID];
+        Organization storage org = organizations[orgID];
         require(org.founder == msg.sender, "Permission denied. Founder only.");
-        require(org.members[app.applicant].addr == address(0), "Already joined in.");
 
         org.members[app.applicant] = Member({ addr: app.applicant });
         org.funds += app.dues;
-        delete applications[appID];
+        delete applications[orgID][applicant];
     }
 
-    // TODO: emit refuse event
+    function rejectApplication(bytes32 orgID, address applicant) public {
+        Application storage app = applications[orgID][applicant];
+        require(app.applicant != address(0), "Application does not exist");
+        require(!app.rejected, "Application has been rejected.");
+
+        Organization storage org = organizations[orgID];
+        require(org.founder == msg.sender, "Permission denied. Founder only.");
+
+        app.rejected = true;
+    }
 
     function exit(bytes32 orgID) public memberOnly(orgID) {
         Organization storage org = organizations[orgID];
