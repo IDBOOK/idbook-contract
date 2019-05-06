@@ -1,7 +1,7 @@
 pragma solidity >=0.4.21 <0.6.0;
 
 contract Connections {
-    address lord;
+    address public lord;
     mapping (address => mapping (bytes => bool)) connections;
 
     constructor() public {

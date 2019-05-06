@@ -23,10 +23,10 @@ contract Organizations {
         bool rejected;
     }
 
-    address lord;
-    uint minPledge;
-    mapping (bytes32 => Organization) organizations;
-    mapping (bytes32 => mapping (address => Application)) applications;
+    address public lord;
+    uint public minPledge;
+    mapping (bytes32 => Organization) public organizations;
+    mapping (bytes32 => mapping (address => Application)) public applications;
     uint nonce;
 
     modifier founderOnly(bytes32 orgID) {
@@ -208,32 +208,6 @@ contract Organizations {
         returns (bool)
     {
         return organizations[orgID].members[member].endorsements[hash];
-    }
-
-    function getInfo(bytes32 orgID)
-        public view
-        returns (
-            bytes32 id,
-            address founder,
-            uint pledge,
-            uint dues,
-            string memory name,
-            string memory intro,
-            uint funds
-        )
-    {
-        require(organizations[orgID].founder != address(0), "Organization does not exist.");
-
-        Organization storage org = organizations[orgID];
-        return (
-            org.id,
-            org.founder,
-            org.pledge,
-            org.dues,
-            org.name,
-            org.intro,
-            org.funds
-        );
     }
 
     function setDues(bytes32 orgID, uint dues) public founderOnly(orgID) {
