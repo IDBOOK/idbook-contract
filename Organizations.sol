@@ -99,7 +99,7 @@ contract Organizations {
         msg.sender.transfer(value);
     }
 
-    function applyJoin(bytes32 orgID, string memory words) public payable {
+    function joinApply(bytes32 orgID, string memory words) public payable {
         Organization storage org = organizations[orgID];
 
         require(org.founder != address(0), "Organization does not exist");
