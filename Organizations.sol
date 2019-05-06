@@ -2,12 +2,12 @@ pragma solidity >=0.4.21 <0.6.0;
 
 contract Organizations {
     struct Member {
-        address addr;
+        bool valid;
         mapping (bytes32 => bool) endorsements;
     }
 
     struct Organization {
-        bytes32 id;
+        bool valid;
         address founder;
         uint pledge;
         uint dues;
@@ -18,7 +18,7 @@ contract Organizations {
     }
 
     struct Application {
-        address applicant;
+        bool valid;
         uint dues;
         bool rejected;
     }
@@ -31,6 +31,10 @@ contract Organizations {
 
     modifier founderOnly(bytes32 orgID) {
         require(
+            organizations[orgID].valid,
+            "Organization does not exist."
+        );
+        require(
             organizations[orgID].founder == msg.sender,
             "Permission denied. Founder only."
         );
@@ -39,7 +43,7 @@ contract Organizations {
 
     modifier memberOnly(bytes32 orgID) {
         require(
-            organizations[orgID].members[msg.sender].addr == msg.sender,
+            organizations[orgID].members[msg.sender].valid,
             "Permission denied. Member only."
         );
         _;
@@ -47,9 +51,16 @@ contract Organizations {
 
     modifier applicantOnly(bytes32 orgID) {
         require(
-            applications[orgID][msg.sender].applicant == msg.sender,
+            applications[orgID][msg.sender].valid,
             "Permission denied. Applicant only."
         );
+        _;
+    }
+
+    modifier applicationValid(bytes32 orgID, address applicant) {
+        Application storage app = applications[orgID][applicant];
+        require(app.valid, "Application does not exist.");
+        require(!app.rejected, "Application has been rejected.");
         _;
     }
 
@@ -65,10 +76,10 @@ contract Organizations {
         require(msg.value >= minPledge, "Insufficient pledge.");
 
         orgID = genID();
-        require(organizations[orgID].founder == address(0), "Duplicate organization ID.");
+        require(!organizations[orgID].valid, "Duplicate organization ID.");
 
         organizations[orgID] = Organization({
-            id: orgID,
+            valid: true,
             founder: msg.sender,
             pledge: msg.value,
             dues: dues,
@@ -76,7 +87,7 @@ contract Organizations {
             intro: intro,
             funds: 0
         });
-        organizations[orgID].members[msg.sender] = Member({ addr: msg.sender });
+        organizations[orgID].members[msg.sender] = Member({ valid: true });
 
         return orgID;
     }
@@ -102,13 +113,13 @@ contract Organizations {
     function joinApply(bytes32 orgID, string memory words) public payable {
         Organization storage org = organizations[orgID];
 
-        require(org.founder != address(0), "Organization does not exist");
-        require(org.members[msg.sender].addr == address(0), "Already joined in.");
+        require(org.valid, "Organization does not exist.");
+        require(!org.members[msg.sender].valid, "Already joined in.");
         require(msg.value >= org.dues, "Insufficient dues.");
-        require(applications[orgID][msg.sender].applicant == address(0), "Duplicate application.");
+        require(!applications[orgID][msg.sender].valid, "Duplicate application.");
 
         applications[orgID][msg.sender] = Application({
-            applicant: msg.sender,
+            valid: true,
             dues: msg.value,
             rejected: false
         });
@@ -122,28 +133,24 @@ contract Organizations {
         msg.sender.transfer(dues);
     }
 
-    function approveApplication(bytes32 orgID, address applicant) public {
-        Application storage app = applications[orgID][applicant];
-        require(app.applicant != address(0), "Application does not exist");
-        require(!app.rejected, "Application has been rejected.");
-
+    function approveApplication(bytes32 orgID, address applicant)
+        public
+        founderOnly(orgID)
+        applicationValid(orgID, applicant)
+    {
         Organization storage org = organizations[orgID];
-        require(org.founder == msg.sender, "Permission denied. Founder only.");
-
-        org.members[app.applicant] = Member({ addr: app.applicant });
+        Application storage app = applications[orgID][applicant];
+        org.members[applicant] = Member({ valid: true });
         org.funds += app.dues;
         delete applications[orgID][applicant];
     }
 
-    function rejectApplication(bytes32 orgID, address applicant) public {
-        Application storage app = applications[orgID][applicant];
-        require(app.applicant != address(0), "Application does not exist");
-        require(!app.rejected, "Application has been rejected.");
-
-        Organization storage org = organizations[orgID];
-        require(org.founder == msg.sender, "Permission denied. Founder only.");
-
-        app.rejected = true;
+    function rejectApplication(bytes32 orgID, address applicant)
+        public
+        founderOnly(orgID)
+        applicationValid(orgID, applicant)
+    {
+        applications[orgID][applicant].rejected = true;
     }
 
     function exit(bytes32 orgID) public memberOnly(orgID) {
@@ -154,29 +161,23 @@ contract Organizations {
     }
 
     function expel(bytes32 orgID, address member) public founderOnly(orgID) {
-        require(member != address(0), "Invalid member.");
-
         Organization storage org = organizations[orgID];
-        require(org.members[member].addr == member, "Member does not exist.");
+        require(org.members[member].valid, "Member does not exist.");
         require(org.founder != member, "Permission denied. Call dismiss instead.");
 
         delete org.members[member];
     }
 
     function checkMember(bytes32 orgID, address member) public view returns (bool) {
-        require(member != address(0), "Invalid member.");
-
-        return organizations[orgID].members[member].addr == member;
+        return organizations[orgID].members[member].valid;
     }
 
     function addEndorsement(bytes32 orgID, address member, bytes32 hash)
         public
         founderOnly(orgID)
     {
-        require(member != address(0), "Invalid member.");
-
         Organization storage org = organizations[orgID];
-        require(org.members[member].addr == member, "Member does not exist.");
+        require(org.members[member].valid, "Member does not exist.");
 
         require(
             !organizations[orgID].members[member].endorsements[hash],
@@ -190,10 +191,8 @@ contract Organizations {
         public
         founderOnly(orgID)
     {
-        require(member != address(0), "Invalid member.");
-
         Organization storage org = organizations[orgID];
-        require(org.members[member].addr == member, "Member does not exist.");
+        require(org.members[member].valid, "Member does not exist.");
 
         require(
             organizations[orgID].members[member].endorsements[hash],
