@@ -8,10 +8,26 @@ contract Connections {
         lord = msg.sender;
     }
 
+    event Connect(
+        bytes32 indexed fromOrg,
+        address indexed fromMember,
+        bytes32 toOrg,
+        address toMember
+    );
+
+    event Disconnect(
+        bytes32 indexed fromOrg,
+        address indexed fromMember,
+        bytes32 toOrg,
+        address toMember
+    );
+
     function connect(bytes32 fromOrg, bytes32 toOrg, address toMember) public {
         bytes32 connection = makeConnection(fromOrg, toOrg, toMember);
 
         require(!connections[msg.sender][connection], "Duplicate connection.");
+
+        emit Connect(fromOrg, msg.sender, toOrg, toMember);
 
         connections[msg.sender][connection] = true;
     }
@@ -20,6 +36,8 @@ contract Connections {
         bytes32 connection = makeConnection(fromOrg, toOrg, toMember);
 
         require(connections[msg.sender][connection], "Connection does not exist.");
+
+        emit Disconnect(fromOrg, msg.sender, toOrg, toMember);
 
         delete connections[msg.sender][connection];
     }
