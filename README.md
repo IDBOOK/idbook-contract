@@ -1,2 +1,2 @@
 # idbook-contract
-idbook contract,  the game of orgnization
+idbook contract,  the game of organization
