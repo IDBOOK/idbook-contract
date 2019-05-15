@@ -42,11 +42,11 @@ contract Connections {
         delete connections[msg.sender][connection];
     }
 
-    function connected(bytes32 fromOrg, bytes32 toOrg, address toMember)
+    function connected(bytes32 fromOrg, address fromMember, bytes32 toOrg, address toMember)
         public view
         returns (bool)
     {
-        return connections[msg.sender][makeConnection(fromOrg, toOrg, toMember)];
+        return connections[fromMember][makeConnection(fromOrg, toOrg, toMember)];
     }
 
     function makeConnection(bytes32 fromOrg, bytes32 toOrg, address toMember)
